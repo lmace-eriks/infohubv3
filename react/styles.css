@@ -1,0 +1,43 @@
+.container {}
+
+.buttonWindowWrapper {
+    border-bottom: 1px solid white;
+}
+
+.button {
+    display: flex;
+    border: none;
+    background-color: transparent;
+    color: white;
+    padding: 0.5rem 0 0.5rem 1rem;
+    cursor: pointer;
+    width: 100%;
+    text-align: left;
+    margin: 0.25rem 0;
+}
+
+.buttonText {
+    padding-left: 1rem;
+}
+
+.arrow {
+    transform: rotate(0deg);
+    transition: transform 300ms ease-in-out;
+}
+
+.button[aria-expanded="true"] .arrow {
+    transform: rotate(90deg);
+}
+
+.button:hover {
+    border: none;
+}
+
+.window {
+    overflow-y: hidden;
+    background-color: rgba(0, 0, 0, 0.25);
+
+    transition: height 300ms ease-in-out;
+}
+
+.childWrapper {}
