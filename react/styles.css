@@ -1,68 +1,35 @@
 .container {
-    margin: 0 auto;
-    width: 100%;
-    max-width: 96rem;
 }
 
 .title {
-    text-align: center;
-    margin: 1rem 0 0.5rem 0;
-    font-size: 1.25rem;
-    font-weight: bold;
 }
 
 .window {
-    overflow-y: hidden;
-
-    transition: height 500ms ease-in-out;
 }
 
 .flexWrapper {
-    display: flex;
-    gap: 1rem;
-    justify-content: space-around;
 }
 
 .gridWrapper {
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    gap: 1rem;
 }
 
 .link {
-    display: grid;
-    place-items: center;
-    position: relative;
-    color: unset;
-    text-decoration: none;
 }
 
 .image {
-    border: 1px solid #d4d4d4;
-    border-radius: 0.5rem;
-    object-fit: cover;
 }
 
 .text {
-    color: white;
-    position: absolute;
-    background-color: rgba(0, 0, 0, 0.75);
-    padding: 0.25rem 1rem;
-    font-weight: bold;
-    text-align: center;
-    max-width: 80%;
 }
 
 .button {
-    display: block;
-    margin: 0 auto;
-    background-color: #ec1d24;
-    color: white;
-    font-weight: bold;
-    text-align: center;
-    font-size: 0.9rem;
-    border-radius: 0.25rem;
-    padding: 0.25rem 0.5rem;
-    border: none;
-    cursor: pointer;
+}
+
+.fallBackContainer {
+}
+
+.fallBackLink {
+}
+
+.fallBackImage {
 }
