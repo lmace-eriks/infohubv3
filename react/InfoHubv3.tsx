@@ -14,7 +14,7 @@ interface InfoHubv3Props {
 interface KeywordObject {
   __editorItemTitle: string;
   keywords: Array<KeywordString>;
-  groupType: number;
+  topicType: number;
   posts: Array<PostObject>;
 }
 
@@ -32,22 +32,28 @@ interface PostObject {
 
 interface KeywordInfoObject {
   keyword: string;
-  group: number;
+  topic: number;
 }
 
-interface GroupWithPriority {
-  group: number;
+interface TopicAndPriority {
+  topic: number;
   priority: number;
 }
 
 interface FallBackObject {
   image: string
+  altText: string
   url: string
+}
+
+interface WindowObject {
+  height: number
+  expanded: boolean
 }
 
 const maximumDesktopPosts = 10;
 const maximumMobilePosts = 6;
-const groupTypes = [
+const topicTypes = [
   "Product",
   "Brand",
   "Product Category",
@@ -56,28 +62,34 @@ const groupTypes = [
   "Erik's",
 ];
 
-const InfoHubv3: StorefrontFunctionComponent<InfoHubv3Props> = ({
-  titleText,
-  fallBack,
-  articles,
-  priority
-}) => {
+const imageSize: { width: number, height: number } = {
+  width: 250,
+  height: 110
+}
+
+const initialWindowState: WindowObject = {
+  height: imageSize.height + 2, // 2px for border.
+  expanded: false
+}
+
+const InfoHubv3: StorefrontFunctionComponent<InfoHubv3Props> = ({ titleText, fallBack, articles, priority }) => {
+  // State
   const [loading, setLoading] = useState(true);
   const [posts, setPosts] = useState<Array<PostObject>>([]);
-  const [expanded, setExpanded] = useState(false);
-  const device = useRef("");
+  const [windowProps, setWindowProps] = useState<WindowObject>(initialWindowState);
+
+  // Refs
+  const device = useRef<"desktop" | "mobile">("mobile");
+  const wrapper = useRef<HTMLUListElement>(null);
+  const activePriorityPosts = useRef(0);
 
   useEffect(() => {
     if (!canUseDOM) return;
-
     window.addEventListener("message", messageHandler);
-
-    return () => {
-      window.removeEventListener("message", messageHandler);
-    };
+    return () => window.removeEventListener("message", messageHandler);
   });
 
-  const messageHandler = (e: any) => {
+  const messageHandler = (e: MessageEvent) => {
     const eventName = e.data.eventName;
     if (eventName === "ebs-infohub-run") resetInfoHub();
   };
@@ -88,8 +100,8 @@ const InfoHubv3: StorefrontFunctionComponent<InfoHubv3Props> = ({
     buildKeywordList();
   };
 
-  // Takes every keyword from all groups and populates single
-  // array with what group they came from.
+  // Takes every keyword from all topics and populates single
+  // array with what topic they came from.
   const buildKeywordList = () => {
     const keywordList: Array<KeywordInfoObject> = [];
 
@@ -97,7 +109,7 @@ const InfoHubv3: StorefrontFunctionComponent<InfoHubv3Props> = ({
       topic.keywords.forEach((keyword) => {
         keywordList.push({
           keyword: keyword?.__editorItemTitle?.toLowerCase(),
-          group: index,
+          topic: index,
         });
       });
     });
@@ -109,68 +121,77 @@ const InfoHubv3: StorefrontFunctionComponent<InfoHubv3Props> = ({
   const searchCurrentURL = (keywordList: Array<KeywordInfoObject>) => {
     if (!canUseDOM) return;
 
-    device.current = window.innerWidth >= 1025 ? "desktop" : "mobile";
-
     const currentURL = window.location.href.split(".com/")[1].toLowerCase();
-    const groupBuilder: Array<number> = [];
+    const topicBuilder: Array<number> = [];
 
+    // Builds [topicBuilder] with numbers of topics to populate.
     keywordList.forEach((keyword) => {
       const matchFound = currentURL.includes(keyword.keyword);
-      if (matchFound) groupBuilder.push(keyword.group);
+      if (matchFound) topicBuilder.push(keyword.topic);
     });
 
     // Escape hatch if no keywords are found.
-    if (!groupBuilder.length) {
+    if (!topicBuilder.length) {
       setLoading(false);
       return;
     }
 
-    // Removes duplicate group matches.
-    const finalGroups = [...new Set(groupBuilder)];
+    // Removes duplicate topic matches.
+    const finalTopics = [...new Set(topicBuilder)];
 
-    sortGroups(finalGroups);
+    // Setting device in this function only to make use of the canUseDOM.
+    device.current = window.innerWidth >= 1026 ? "desktop" : "mobile";
+
+    sortTopics(finalTopics);
   };
 
-  // Sorts groups by priority (group type).
-  const sortGroups = (finalGroups: Array<number>) => {
-    const unsortedGroups: Array<GroupWithPriority> = [];
+  // Sorts topics by priority (topic type).
+  const sortTopics = (finalTopics: Array<number>) => {
+    const unsortedTopics: Array<TopicAndPriority> = [];
 
-    finalGroups.forEach((group) => {
-      unsortedGroups.push({
-        group,
-        priority: articles[group].groupType
+    finalTopics.forEach((topic) => {
+      unsortedTopics.push({
+        topic,
+        priority: articles[topic].topicType
       });
     });
 
-    const compare: any = (a: GroupWithPriority, b: GroupWithPriority) => a.priority > b.priority;
-    const sortedGroupsWithPriority = unsortedGroups.sort(compare);
-    const sortedGroups = sortedGroupsWithPriority.map((group) => group.group);
+    const comparisonFunction: any = (a: TopicAndPriority, b: TopicAndPriority) => a.priority > b.priority;
+    const sortedTopicsWithPriority = unsortedTopics.sort(comparisonFunction);
+    const sortedFinalTopics = sortedTopicsWithPriority.map((topicAndPriorityObject) => topicAndPriorityObject.topic);
 
-    buildPosts(sortedGroups);
+    buildPosts(sortedFinalTopics);
   };
 
   // Builds posts array.
-  const buildPosts = (finalGroups: Array<number>) => {
+  const buildPosts = (sortedFinalTopics: Array<number>) => {
     const postBuilder: Array<PostObject> = [];
-    finalGroups.forEach((groupNumber) => {
-      articles[groupNumber].posts.forEach((post) => {
+
+    sortedFinalTopics.forEach((topicNumber) => {
+      articles[topicNumber].posts.forEach((post) => {
         postBuilder.push(post);
       });
     });
 
-    // Add Priority posts to beginning of array
+    // Add Priority posts to beginning of array.
     const priorityWithArticles = priority.concat(postBuilder);
+
+    // Determine number of active priority posts for final render check.
+    // This is important because we do not want only priority
+    // posts to render if there are no organic results.
+    activePriorityPosts.current = priority.reduce((accumulator, post) => accumulator + (post.active ? 1 : 0), 0);
 
     removeInactivePosts(priorityWithArticles);
   };
 
   // Searches posts array for inactive posts. Posts might be
-  // inactivated or not yet scheduled.
+  // inactivated or scheduled for the future.
   const removeInactivePosts = (postBuilder: Array<PostObject>) => {
     const rightNow = Date.now();
 
     const postsWithInactive = [...postBuilder];
 
+    // Set posts that are scheduled for the future to active: false.
     postsWithInactive.forEach((post) => {
       const startDate = Date.parse(post.startDate);
       if (startDate) {
@@ -179,6 +200,7 @@ const InfoHubv3: StorefrontFunctionComponent<InfoHubv3Props> = ({
       }
     });
 
+    // Filter out all inactive posts.
     const activePosts = postsWithInactive.filter((post) => post.active);
 
     removeDuplicatePosts(activePosts);
@@ -222,53 +244,55 @@ const InfoHubv3: StorefrontFunctionComponent<InfoHubv3Props> = ({
     setLoading(false);
   };
 
-  const handleClick = () => {
-    setExpanded(!expanded);
+  const handleWindowExpand = () => {
+    if (windowProps.expanded) {
+      setWindowProps(initialWindowState);
+    } else {
+      setWindowProps({ height: wrapper.current?.offsetHeight!, expanded: true });
+    }
   };
 
   const FallBack = () => (
     <div className={styles.fallBackContainer}>
       {fallBack.url ? <Link href={fallBack.url} target="_blank" rel="noreferrer" className={styles.fallBackLink}>
-        <img src={fallBack.image} height={120} width={1536} className={styles.fallBackImage} />
+        <img src={fallBack.image} alt={fallBack.altText} height={120} width={1536} className={styles.fallBackImage} />
       </Link> :
-        <img src={fallBack.image} height={120} width={1536} className={styles.fallBackImage} />}
+        <img src={fallBack.image} alt={fallBack.altText} height={120} width={1536} className={styles.fallBackImage} />}
     </div>
   )
 
   if (loading) return <></>;
-  if (!posts.length || priority.length === posts.length) return <FallBack />;
+
+  // Empty Posts Array 
+  if (!posts.length) return <FallBack />;
+  // Priority Posts are the only valid items in array
+  if (posts.length === activePriorityPosts.current) <FallBack />
 
   return (
-    <div className={styles.container}>
-      {titleText && <div className={styles.title}>{titleText}</div>}
-      <div style={{ height: expanded ? `16rem` : `7.5rem` }} className={styles.window}>
-        <div className={posts.length <= 5 ? styles.flexWrapper : styles.gridWrapper}>
+    <section aria-labelledby="title-text" className={styles.container}>
+      {titleText ?
+        <h2 id="title-text" className={styles.title}>{titleText}</h2> :
+        <h2 id="title-text" className={styles.srOnly}>Related Articles</h2>}
+      <div id="article-window" style={{ height: `${windowProps.height}px` }} className={styles.window}>
+        <ul ref={wrapper} className={posts.length <= 5 ? styles.flexWrapper : styles.gridWrapper}>
           {posts.map((post, index) => (
-            <Link
-              key={`post-${index}`}
-              href={post.url}
-              target="_blank"
-              rel="noreferrer"
-              className={styles.link}
-            >
-              <img
-                src={post.image}
-                alt=""
-                width={250}
-                height={110}
-                className={styles.image}
-              />
-              <div className={styles.text}>{post.__editorItemTitle}</div>
-            </Link>
+            <li key={`post-${index}`} className={styles.listItem}>
+              <Link href={post.url} target="_blank" rel="noreferrer" className={styles.link} >
+                <img src={post.image} alt="" width={imageSize.width} height={imageSize.height} className={styles.image} />
+                <div className={styles.text}>
+                  {post.__editorItemTitle}
+                </div>
+              </Link>
+            </li>
           ))}
-        </div>
+        </ul>
       </div>
       {posts.length > 5 && (
-        <button onClick={handleClick} className={styles.button}>
-          {`Show ${expanded ? `Fewer` : `More`} Articles`}
+        <button aria-expanded={windowProps.expanded} aria-controls="article-window" onClick={handleWindowExpand} className={styles.button}>
+          {`Show ${windowProps.expanded ? `Fewer` : `More`} Articles`}
         </button>
       )}
-    </div>
+    </section>
   );
 };
 
@@ -302,7 +326,7 @@ InfoHubv3.schema = {
             default: true,
           },
           image: {
-            title: "Image - 250px 110px",
+            title: `Image - ${imageSize.width}px ${imageSize.height}px`,
             type: "string",
             widget: { "ui:widget": "image-uploader" },
           },
@@ -320,7 +344,7 @@ InfoHubv3.schema = {
       }
     },
     articles: {
-      title: "Article Groups",
+      title: "Article Topics",
       type: "array",
       items: {
         properties: {
@@ -329,12 +353,12 @@ InfoHubv3.schema = {
             type: "string",
             description: "Non-functional name. Exists for readability.",
           },
-          groupType: {
-            title: "Group Type",
+          topicType: {
+            title: "Topic Type",
             type: "number",
-            enum: groupTypes.map((_, index) => index),
-            enumNames: groupTypes.map((type) => type),
-            default: groupTypes.length - 1,
+            enum: topicTypes.map((_, index) => index),
+            enumNames: topicTypes.map((type) => type),
+            default: topicTypes.length - 1,
             widget: { "ui:widget": "radio" },
           },
           keywords: {
@@ -354,7 +378,9 @@ InfoHubv3.schema = {
           posts: {
             title: "Posts",
             type: "array",
+            required: ["__editorItemTitle", "url"],
             items: {
+              required: ["__editorItemTitle", "url"],
               properties: {
                 startDate: {
                   title: "Start Date",
@@ -368,7 +394,7 @@ InfoHubv3.schema = {
                   default: true
                 },
                 image: {
-                  title: "Image - 250px 110px",
+                  title: `Image - ${imageSize.width}px ${imageSize.height}px`,
                   type: "string",
                   widget: { "ui:widget": "image-uploader" },
                 },
@@ -396,6 +422,12 @@ InfoHubv3.schema = {
           title: "Fallback Image - 1536px 120px",
           type: "string",
           widget: { "ui:widget": "image-uploader" }
+        },
+        altText: {
+          title: "Fallback Image Alt Text",
+          description: "Required",
+          type: "string",
+          widget: { "ui:widget": "textarea" }
         },
         url: {
           title: "Fallback URL",
