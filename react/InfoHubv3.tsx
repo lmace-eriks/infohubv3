@@ -6,7 +6,6 @@ import styles from "./styles.css";
 
 interface InfoHubv3Props {
   titleText: string;
-  fallBack: FallBackObject
   articles: Array<KeywordObject>
   priority: Array<PostObject>
 }
@@ -40,12 +39,6 @@ interface TopicAndPriority {
   priority: number;
 }
 
-interface FallBackObject {
-  image: string
-  altText: string
-  url: string
-}
-
 interface WindowObject {
   height: number
   expanded: boolean
@@ -72,7 +65,7 @@ const initialWindowState: WindowObject = {
   expanded: false
 }
 
-const InfoHubv3: StorefrontFunctionComponent<InfoHubv3Props> = ({ titleText, fallBack, articles, priority }) => {
+const InfoHubv3: StorefrontFunctionComponent<InfoHubv3Props> = ({ titleText, articles, priority }) => {
   // State
   const [loading, setLoading] = useState(true);
   const [posts, setPosts] = useState<Array<PostObject>>([]);
@@ -252,21 +245,13 @@ const InfoHubv3: StorefrontFunctionComponent<InfoHubv3Props> = ({ titleText, fal
     }
   };
 
-  const FallBack = () => (
-    <div className={styles.fallBackContainer}>
-      {fallBack.url ? <Link href={fallBack.url} target="_blank" rel="noreferrer" className={styles.fallBackLink}>
-        <img src={fallBack.image} alt={fallBack.altText} height={120} width={1536} className={styles.fallBackImage} />
-      </Link> :
-        <img src={fallBack.image} alt={fallBack.altText} height={120} width={1536} className={styles.fallBackImage} />}
-    </div>
-  )
-
   if (loading) return <></>;
 
   // Empty Posts Array 
-  if (!posts.length) return <FallBack />;
+  if (!posts.length) return <></>;
+
   // Priority Posts are the only valid items in array
-  if (posts.length === activePriorityPosts.current) <FallBack />
+  if (posts.length === activePriorityPosts.current) return <></>;
 
   return (
     <section aria-labelledby="title-text" className={styles.container}>
@@ -411,29 +396,6 @@ InfoHubv3.schema = {
               }
             }
           }
-        }
-      }
-    },
-    fallBack: {
-      title: "FallBack Image",
-      type: "object",
-      properties: {
-        image: {
-          title: "Fallback Image - 1536px 120px",
-          type: "string",
-          widget: { "ui:widget": "image-uploader" }
-        },
-        altText: {
-          title: "Fallback Image Alt Text",
-          description: "Required",
-          type: "string",
-          widget: { "ui:widget": "textarea" }
-        },
-        url: {
-          title: "Fallback URL",
-          description: "Optional",
-          type: "string",
-          widget: { "ui:widget": "textarea" }
         }
       }
     },
