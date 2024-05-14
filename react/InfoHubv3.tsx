@@ -66,6 +66,17 @@ const initialWindowState: WindowObject = {
 }
 
 const InfoHubv3: StorefrontFunctionComponent<InfoHubv3Props> = ({ titleText, articles, priority }) => {
+  const showInfoHub = () => {
+    // Hide InfoHub on specific pages with URL parameter. - LM
+    if (!canUseDOM) return false;
+
+    const params = new URLSearchParams(document.location.search);
+    const ih = params.get("ih");
+    return ih === "0" ? false : true;
+  }
+
+  if (!showInfoHub()) return <></>;
+
   // State
   const [loading, setLoading] = useState(true);
   const [posts, setPosts] = useState<Array<PostObject>>([]);
@@ -83,6 +94,8 @@ const InfoHubv3: StorefrontFunctionComponent<InfoHubv3Props> = ({ titleText, art
   });
 
   const messageHandler = (e: MessageEvent) => {
+    if (!showInfoHub()) return;
+
     const eventName = e.data.eventName;
     if (eventName === "ebs-infohub-run") resetInfoHub();
   };
