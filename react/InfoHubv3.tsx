@@ -111,13 +111,15 @@ const InfoHubv3: StorefrontFunctionComponent<InfoHubv3Props> = ({ titleText, art
   const buildKeywordList = () => {
     const keywordList: Array<KeywordInfoObject> = [];
 
-    articles.forEach((topic, index) => {
-      topic.keywords.forEach((keyword) => {
+    // O(n * m)
+    articles.forEach((article, index) => {
+      const keywords = article.keywords.map((keyword) => keyword.__editorItemTitle);
+      keywords.forEach(keyword => {
         keywordList.push({
-          keyword: keyword?.__editorItemTitle?.toLowerCase(),
-          topic: index,
-        });
-      });
+          keyword: keyword.toLowerCase(),
+          topic: index
+        })
+      })
     });
 
     searchCurrentURL(keywordList);
@@ -127,14 +129,12 @@ const InfoHubv3: StorefrontFunctionComponent<InfoHubv3Props> = ({ titleText, art
   const searchCurrentURL = (keywordList: Array<KeywordInfoObject>) => {
     if (!canUseDOM) return;
 
-    const currentURL = window.location.href.split(".com/")[1].toLowerCase();
-    const topicBuilder: Array<number> = [];
+    const currentURL = (window.location.pathname + window.location.search).toLowerCase();
 
     // Builds [topicBuilder] with numbers of topics to populate.
-    keywordList.forEach((keyword) => {
-      const matchFound = currentURL.includes(keyword.keyword);
-      if (matchFound) topicBuilder.push(keyword.topic);
-    });
+    const topicBuilder: Array<number> = keywordList.map(keyword => (
+      currentURL.includes(keyword.keyword) ? keyword.topic : -1
+    )).filter(topicNumber => topicNumber !== -1);
 
     // Escape hatch if no keywords are found.
     if (!topicBuilder.length) {
@@ -153,14 +153,12 @@ const InfoHubv3: StorefrontFunctionComponent<InfoHubv3Props> = ({ titleText, art
 
   // Sorts topics by priority (topic type).
   const sortTopics = (finalTopics: Array<number>) => {
-    const unsortedTopics: Array<TopicAndPriority> = [];
-
-    finalTopics.forEach((topic) => {
-      unsortedTopics.push({
+    const unsortedTopics: TopicAndPriority[] = finalTopics.map(topic => (
+      {
         topic,
         priority: articles[topic].topicType
-      });
-    });
+      }
+    ));
 
     const comparisonFunction: any = (a: TopicAndPriority, b: TopicAndPriority) => a.priority > b.priority;
     const sortedTopicsWithPriority = unsortedTopics.sort(comparisonFunction);
@@ -171,16 +169,13 @@ const InfoHubv3: StorefrontFunctionComponent<InfoHubv3Props> = ({ titleText, art
 
   // Builds posts array.
   const buildPosts = (sortedFinalTopics: Array<number>) => {
-    const postBuilder: Array<PostObject> = [];
-
-    sortedFinalTopics.forEach((topicNumber) => {
-      articles[topicNumber].posts.forEach((post) => {
-        postBuilder.push(post);
-      });
-    });
+    const postBuilder = sortedFinalTopics.reduce<PostObject[]>((accumulator: PostObject[], current: number) => {
+      const currentPostList = articles[current].posts;
+      return [...accumulator, ...currentPostList];
+    }, []);
 
     // Add Priority posts to beginning of array.
-    const priorityWithArticles = priority.concat(postBuilder);
+    const priorityWithArticles = [...priority, ...postBuilder];
 
     // Determine number of active priority posts for final render check.
     // This is important because we do not want only priority
@@ -190,20 +185,21 @@ const InfoHubv3: StorefrontFunctionComponent<InfoHubv3Props> = ({ titleText, art
     removeInactivePosts(priorityWithArticles);
   };
 
-  // Searches posts array for inactive posts. Posts might be
-  // inactivated or scheduled for the future.
+  // Searches posts array for inactive posts. Posts might be inactivated or scheduled for the future.
   const removeInactivePosts = (postBuilder: Array<PostObject>) => {
     const rightNow = Date.now();
 
-    const postsWithInactive = [...postBuilder];
-
-    // Set posts that are scheduled for the future to active: false.
-    postsWithInactive.forEach((post) => {
+    // Find posts scheduled for the future and set them to active: false
+    const postsWithInactive = postBuilder.map(post => {
+      const tempPost = { ...post };
       const startDate = Date.parse(post.startDate);
+
       if (startDate) {
         const notYetActive = startDate > rightNow;
-        if (notYetActive) post.active = false;
+        tempPost.active = notYetActive ? false : true;
       }
+
+      return tempPost;
     });
 
     // Filter out all inactive posts.
@@ -212,23 +208,16 @@ const InfoHubv3: StorefrontFunctionComponent<InfoHubv3Props> = ({ titleText, art
     removeDuplicatePosts(activePosts);
   };
 
-  // Removes duplicate posts from post array.
-  const removeDuplicatePosts = (postBuilder: Array<PostObject>) => {
-    postBuilder.forEach((parentPost, parentIndex) => {
-      const checkForTitle = parentPost.__editorItemTitle;
+  const removeDuplicatePosts = (activePosts: Array<PostObject>) => {
+    const postMap: Map<string, PostObject> = new Map();
 
-      postBuilder.forEach((post, index) => {
-        if (parentIndex !== index) {
-          // If Post Title is a duplicate, remove post. Other properties are ignored.
-          const matchFound = post.__editorItemTitle === checkForTitle;
-          if (matchFound) {
-            postBuilder.splice(index, 1);
-          }
-        }
-      });
-    });
+    // Set post title as the map key and the PostObject as the value.
+    for (const post of activePosts) postMap.set(post.__editorItemTitle, post);
 
-    buildRender(postBuilder);
+    // post[1] contains the PostObject
+    const uniquePosts = [...postMap].map(post => post[1]);
+
+    buildRender(uniquePosts);
   };
 
   // Determine how to render based on user's window width.

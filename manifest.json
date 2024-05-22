@@ -1,12 +1,11 @@
 {
   "vendor": "eriksbikeshop",
   "name": "infohubv3",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "title": "InfoHubv3",
   "description": "InfoHubv3 component",
   "defaultLocale": "pt-BR",
   "builders": {
-    "messages": "1.x",
     "store": "0.x",
     "react": "3.x"
   },
